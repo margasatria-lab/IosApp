@@ -1,3 +1,4 @@
+import { Picker } from '@react-native-picker/picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -16,6 +17,75 @@ const formatDate = (date: Date): string =>
     month: 'long',
     day: 'numeric',
   });
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const daysInMonth = (year: number, month: number): number => new Date(year, month + 1, 0).getDate();
+
+// @react-native-community/datetimepicker has no web implementation, so the
+// web build uses three plain dropdowns (backed by @react-native-picker/picker,
+// which does work on web) instead of the native spinner.
+function WebDateSelector({ value, onChange }: DateFieldProps) {
+  const year = value.getFullYear();
+  const month = value.getMonth();
+  const day = value.getDate();
+
+  const years = Array.from({ length: 11 }, (_, i) => year - 5 + i);
+  const days = Array.from({ length: daysInMonth(year, month) }, (_, i) => i + 1);
+
+  const setDate = (nextYear: number, nextMonth: number, nextDay: number) => {
+    const clampedDay = Math.min(nextDay, daysInMonth(nextYear, nextMonth));
+    onChange(new Date(nextYear, nextMonth, clampedDay));
+  };
+
+  return (
+    <View style={styles.webSelectorRow}>
+      <Picker
+        style={styles.webSelectorPicker}
+        selectedValue={month}
+        onValueChange={(nextMonth) => setDate(year, Number(nextMonth), day)}
+        accessibilityLabel="Month"
+      >
+        {MONTH_NAMES.map((name, index) => (
+          <Picker.Item key={name} label={name} value={index} />
+        ))}
+      </Picker>
+      <Picker
+        style={styles.webSelectorPicker}
+        selectedValue={day}
+        onValueChange={(nextDay) => setDate(year, month, Number(nextDay))}
+        accessibilityLabel="Day"
+      >
+        {days.map((d) => (
+          <Picker.Item key={d} label={String(d)} value={d} />
+        ))}
+      </Picker>
+      <Picker
+        style={styles.webSelectorPicker}
+        selectedValue={year}
+        onValueChange={(nextYear) => setDate(Number(nextYear), month, day)}
+        accessibilityLabel="Year"
+      >
+        {years.map((y) => (
+          <Picker.Item key={y} label={String(y)} value={y} />
+        ))}
+      </Picker>
+    </View>
+  );
+}
 
 export function DateField({ value, onChange }: DateFieldProps) {
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -46,7 +116,7 @@ export function DateField({ value, onChange }: DateFieldProps) {
         <DateTimePicker value={value} mode="date" display="default" onChange={handleChange} />
       ) : null}
 
-      {Platform.OS === 'ios' ? (
+      {Platform.OS !== 'android' ? (
         <Modal visible={pickerVisible} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
@@ -60,13 +130,17 @@ export function DateField({ value, onChange }: DateFieldProps) {
                   <Text style={styles.doneText}>Done</Text>
                 </Pressable>
               </View>
-              <DateTimePicker
-                value={value}
-                mode="date"
-                display="spinner"
-                onChange={handleChange}
-                style={styles.spinner}
-              />
+              {Platform.OS === 'web' ? (
+                <WebDateSelector value={value} onChange={onChange} />
+              ) : (
+                <DateTimePicker
+                  value={value}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleChange}
+                  style={styles.spinner}
+                />
+              )}
             </View>
           </View>
         </Modal>
@@ -119,5 +193,13 @@ const styles = StyleSheet.create({
   },
   spinner: {
     alignSelf: 'center',
+  },
+  webSelectorRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  webSelectorPicker: {
+    flex: 1,
   },
 });
